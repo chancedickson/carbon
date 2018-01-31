@@ -1,3 +1,4 @@
 carbon
 config
 *.tar.gz
+.DS_Store
