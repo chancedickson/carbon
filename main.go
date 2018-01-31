@@ -57,7 +57,7 @@ func cfstring(s string) C.CFStringRef {
 
 func shouldBeActive() bool {
 	t := time.Now()
-	return t.Hour() < 7
+	return t.Hour() < 7 || t.Hour() > 22 || t.Weekday() == time.Friday || t.Weekday() == time.Saturday || t.Weekday() == time.Sunday
 }
 
 func isDisplayAwake() bool {
