@@ -34,21 +34,25 @@ const (
 	ioDisplayWrangler = "IOService:/IOResources/IODisplayWrangler"
 )
 
-type configT struct {
+type configJSON struct {
 	Key         string `json:"key"`
 	URL         string `json:"url"`
 	FallbackURL string `json:"fallbackUrl"`
 	Template    string `json:"template"`
+}
+
+type config struct {
+	configJSON
 	ID          string
 	MinerPath   string
 }
 
-type stateT struct {
+type state struct {
 	Active bool
 	Awake  bool
 }
 
-type subT chan stateT
+type sub chan state
 
 func cfstring(s string) C.CFStringRef {
 	n := C.CFIndex(len(s))
@@ -98,7 +102,7 @@ func awakeMonitor(awake chan bool) {
 	}
 }
 
-func miner(sub subT, minerPath string, args []string) {
+func miner(sub sub, minerPath string, args []string) {
 	on := false
 	var c *exec.Cmd
 	for {
@@ -119,8 +123,8 @@ func miner(sub subT, minerPath string, args []string) {
 	}
 }
 
-func stateLoop(active, awake chan bool, subs ...subT) {
-	state := stateT{Active: <-active, Awake: <-awake}
+func stateLoop(active, awake chan bool, subs ...sub) {
+	state := state{Active: <-active, Awake: <-awake}
 	log.Printf("Initial state - Active: %v, Awake: %v", state.Active, state.Awake)
 	for {
 		select {
@@ -197,13 +201,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	config := configT{}
-	err = downloadJSON(configURL, &config)
+	configJSON := configJSON{}
+	err = downloadJSON(configURL, &configJSON)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	config.ID = id
-	config.MinerPath = minerPath
+	config := config{configJSON, id, minerPath}
 
 	var buf bytes.Buffer
 	cmd, err := template.New("cmd").Parse(config.Template)
@@ -217,7 +220,7 @@ func main() {
 
 	active := make(chan bool)
 	awake := make(chan bool)
-	minerSub := make(subT)
+	minerSub := make(sub)
 	go activeMonitor(active)
 	go awakeMonitor(awake)
 	go miner(minerSub, minerPath, strings.Split(buf.String(), " "))
