@@ -68,7 +68,7 @@ func isDisplayAwake() bool {
 	registryEntry := C.IORegistryEntryFromPath(C.kIOMasterPortDefault, C.CString(ioDisplayWrangler))
 	dict := (C.CFDictionaryRef)(C.IORegistryEntryCreateCFProperty(registryEntry, cfstring(ioPowerManagement), C.kCFAllocatorDefault, 0))
 	resPtr := (C.CFNumberRef)(C.CFDictionaryGetValue(dict, unsafe.Pointer(cfstring(currentPowerState))))
-	if resPtr != nil {
+	if resPtr != 0 {
 		var num int
 		C.CFNumberGetValue(resPtr, C.kCFNumberSInt64Type, unsafe.Pointer(&num))
 		if num < 3 {
